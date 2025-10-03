@@ -13,8 +13,8 @@ func Migrate(db *sql.DB) error {
 			phone VARCHAR(50),
 			position VARCHAR(100),
 			is_active BOOLEAN DEFAULT true,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP 
 		)`,
 		
 		`CREATE TABLE IF NOT EXISTS attendances (
@@ -31,7 +31,7 @@ func Migrate(db *sql.DB) error {
 			device_info TEXT,
 			is_suspicious BOOLEAN DEFAULT false,
 			suspicious_reasons TEXT[],
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 		)`,
 		
 		`CREATE INDEX IF NOT EXISTS idx_attendances_employee_id ON attendances(employee_id)`,

@@ -4,13 +4,10 @@
 import { useState } from 'react';
 import AttendanceForm from './components/AttendanceForm';
 import AttendanceHistory from './components/AttendanceHistory';
-import { Camera, History } from 'lucide-react'; // Kita akan pakai ikon
+import { Camera, History } from 'lucide-react'; // <-- Impor ikon
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'absen' | 'history'>('absen');
-
-  // Untuk menggunakan ikon, install dulu: npm install lucide-react
-  // Jika belum, untuk sementara bisa ganti <Camera /> dan <History /> dengan emoji
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-8">
@@ -25,15 +22,15 @@ export default function Home() {
             onClick={() => setActiveTab('absen')}
             className={`flex-1 flex justify-center items-center gap-2 py-4 px-6 font-semibold transition-all duration-300 ${activeTab === 'absen' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
           >
-            {/* <Camera size={20} /> (Ganti dengan emoji 📸 jika belum install lucide-react) */}
-            📸 Absen Sekarang
+            <Camera size={20} /> {/* <-- Gunakan Ikon */}
+            Absen Sekarang
           </button>
           <button
             onClick={() => setActiveTab('history')}
             className={`flex-1 flex justify-center items-center gap-2 py-4 px-6 font-semibold transition-all duration-300 ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
           >
-            {/* <History size={20} /> (Ganti dengan emoji 📋 jika belum install lucide-react) */}
-            📋 Riwayat Absensi
+            <History size={20} /> {/* <-- Gunakan Ikon */}
+            Riwayat Absensi
           </button>
         </div>
 
@@ -41,7 +38,7 @@ export default function Home() {
       </div>
 
       <footer className="text-center mt-8 text-sm text-gray-400">
-        <p>&copy; {new Date().getFullYear()} Your Company. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Test Golang by fakhri. All rights reserved.</p>
       </footer>
     </div>
   );
