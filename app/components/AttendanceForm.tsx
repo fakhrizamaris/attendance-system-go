@@ -1,8 +1,6 @@
-// FILE: app/components/AttendanceForm.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import ExifReader from 'exifreader';
+import { useState, useRef } from 'react';
 
 interface LocationData {
   latitude: number;
@@ -12,77 +10,38 @@ interface LocationData {
   address?: string;
 }
 
-interface SecurityCheck {
-  passed: boolean;
-  message: string;
-  level: 'success' | 'warning' | 'error';
-}
+// Helper component untuk loading spinner
+const Spinner = () => (
+  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 export default function AttendanceForm() {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [securityChecks, setSecurityChecks] = useState<SecurityCheck[]>([]);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
-  const [photoMetadata, setPhotoMetadata] = useState<any>(null);
-  const [submitStatus, setSubmitStatus] = useState<string>('');
+  const [submitStatus, setSubmitStatus] = useState({ message: '', type: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    performSecurityChecks();
-  }, []);
-
-  const performSecurityChecks = () => {
-    const checks: SecurityCheck[] = [];
-
-    // Check 1: Developer tools detection
-    const devToolsOpen = window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160;
-
-    checks.push({
-      passed: !devToolsOpen,
-      message: devToolsOpen ? '⚠️ Developer tools terdeteksi terbuka' : '✓ Developer tools tidak aktif',
-      level: devToolsOpen ? 'warning' : 'success',
-    });
-
-    // Check 2: Geolocation API availability
-    checks.push({
-      passed: 'geolocation' in navigator,
-      message: 'geolocation' in navigator ? '✓ GPS tersedia' : '✗ GPS tidak tersedia di browser ini',
-      level: 'geolocation' in navigator ? 'success' : 'error',
-    });
-
-    // Check 3: Secure context (HTTPS)
-    const isSecure = window.isSecureContext;
-    checks.push({
-      passed: isSecure,
-      message: isSecure ? '✓ Koneksi aman (HTTPS)' : '⚠️ Koneksi tidak aman (HTTP)',
-      level: isSecure ? 'success' : 'warning',
-    });
-
-    // Check 4: Check if running in iframe (possible attack)
-    const inIframe = window.self !== window.top;
-    checks.push({
-      passed: !inIframe,
-      message: inIframe ? '⚠️ Aplikasi berjalan dalam iframe' : '✓ Aplikasi berjalan normal',
-      level: inIframe ? 'warning' : 'success',
-    });
-
-    setSecurityChecks(checks);
-  };
 
   const getLocation = async () => {
     setLoading(true);
-    setSubmitStatus('');
+    setSubmitStatus({ message: '', type: '' });
+
+    if (!navigator.geolocation) {
+      alert('GPS tidak didukung di browser ini.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      if (!navigator.geolocation) {
-        throw new Error('GPS tidak didukung di browser ini');
-      }
-
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
           maximumAge: 0,
         });
       });
@@ -104,11 +63,6 @@ export default function AttendanceForm() {
       }
 
       setLocation(locationData);
-
-      // Validasi akurasi GPS
-      if (locationData.accuracy > 50) {
-        alert(`⚠️ Akurasi GPS rendah (${Math.round(locationData.accuracy)}m). ` + 'Pastikan GPS aktif dan Anda berada di area terbuka.');
-      }
     } catch (error: any) {
       alert('Gagal mendapatkan lokasi: ' + error.message);
     } finally {
@@ -116,82 +70,22 @@ export default function AttendanceForm() {
     }
   };
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
-
-    // Extract EXIF data
-    try {
-      const tags = await ExifReader.load(file);
-
-      const metadata: any = {
-        dateTime: tags.DateTime?.description || 'Tidak tersedia',
-        make: tags.Make?.description || 'Tidak tersedia',
-        model: tags.Model?.description || 'Tidak tersedia',
-        gps: null,
-      };
-
-      // Extract GPS data
-      if (tags.GPSLatitude && tags.GPSLongitude) {
-        const lat = tags.GPSLatitude.description;
-        const lon = tags.GPSLongitude.description;
-        metadata.gps = {
-          latitude: lat,
-          longitude: lon,
-        };
-      }
-
-      setPhotoMetadata(metadata);
-
-      // Validasi: cek apakah GPS foto sesuai dengan lokasi saat ini
-      if (metadata.gps && location) {
-        const distance = calculateDistance(location.latitude, location.longitude, parseFloat(metadata.gps.latitude), parseFloat(metadata.gps.longitude));
-
-        if (distance > 0.1) {
-          // lebih dari 100 meter
-          alert(`⚠️ PERINGATAN: Lokasi foto berbeda ${Math.round(distance * 1000)}m dari lokasi Anda saat ini. ` + 'Foto mungkin tidak diambil di lokasi ini!');
-        }
-      }
-    } catch (error) {
-      console.error('Gagal membaca EXIF:', error);
-      setPhotoMetadata({ error: 'Tidak ada metadata EXIF' });
-    }
   };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius bumi dalam km
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const toRad = (deg: number) => deg * (Math.PI / 180);
 
   const handleSubmit = async () => {
-    if (!location) {
-      alert('Silakan ambil lokasi terlebih dahulu!');
+    if (!location || !photoFile) {
+      alert('Lokasi dan foto harus diisi!');
       return;
     }
 
-    if (!photoFile) {
-      alert('Silakan upload foto bukti kerja!');
-      return;
-    }
-
-    // Check security issues
-    const hasError = securityChecks.some((check) => !check.passed && check.level === 'error');
-    if (hasError) {
-      alert('Tidak dapat submit karena ada masalah keamanan!');
-      return;
-    }
-
-    setLoading(true);
-    setSubmitStatus('');
+    setSubmitLoading(true);
+    setSubmitStatus({ message: '', type: '' });
 
     try {
       const formData = new FormData();
@@ -199,136 +93,90 @@ export default function AttendanceForm() {
       formData.append('latitude', location.latitude.toString());
       formData.append('longitude', location.longitude.toString());
       formData.append('accuracy', location.accuracy.toString());
-      formData.append('timestamp', location.timestamp.toString());
       formData.append('address', location.address || '');
-      formData.append('photoMetadata', JSON.stringify(photoMetadata));
-      formData.append('securityChecks', JSON.stringify(securityChecks));
 
-      // Kirim ke backend (ganti dengan URL backend Anda)
       const response = await fetch('http://localhost:8080/api/attendance', {
         method: 'POST',
         body: formData,
-        credentials: 'include',
+        credentials: 'include', // Penting untuk mengirim cookie/token
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Gagal submit absensi');
+        throw new Error(result.error || 'Gagal mengirim absensi.');
       }
 
-      const result = await response.json();
-      setSubmitStatus('✓ Absensi berhasil disimpan!');
+      setSubmitStatus({ message: '✓ Absensi berhasil disimpan!', type: 'success' });
 
-      // Reset form
+      // Reset form setelah 2 detik
       setTimeout(() => {
         setLocation(null);
         setPhotoFile(null);
         setPhotoPreview('');
-        setPhotoMetadata(null);
-        setSubmitStatus('');
+        setSubmitStatus({ message: '', type: '' });
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
       }, 2000);
     } catch (error: any) {
-      setSubmitStatus('✗ Gagal submit: ' + error.message);
+      setSubmitStatus({ message: `✗ Gagal: ${error.message}`, type: 'error' });
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Security Checks */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h3 className="font-semibold mb-3 text-gray-700">🔒 Pemeriksaan Keamanan</h3>
-        <div className="space-y-2">
-          {securityChecks.map((check, idx) => (
-            <div key={idx} className={`text-sm p-2 rounded ${check.level === 'success' ? 'bg-green-100 text-green-800' : check.level === 'warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-              {check.message}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Get Location */}
-      <div>
-        <button onClick={getLocation} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-          {loading ? '⏳ Mengambil Lokasi...' : '📍 Ambil Lokasi Saya'}
+      {/* Tombol Get Location */}
+      {!location && (
+        <button
+          onClick={getLocation}
+          disabled={loading}
+          className="w-full flex justify-center items-center gap-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-transform transform active:scale-95"
+        >
+          {loading ? <Spinner /> : '📍'}
+          {loading ? 'Mencari Lokasi...' : 'Ambil Lokasi Saat Ini'}
         </button>
+      )}
 
-        {location && (
-          <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-800 mb-2">✓ Lokasi Terdeteksi</h4>
-            <div className="text-sm space-y-1 text-gray-700">
-              <p>
-                <strong>Latitude:</strong> {location.latitude.toFixed(6)}
-              </p>
-              <p>
-                <strong>Longitude:</strong> {location.longitude.toFixed(6)}
-              </p>
-              <p>
-                <strong>Akurasi:</strong> {Math.round(location.accuracy)} meter
-              </p>
-              {location.address && (
-                <p>
-                  <strong>Alamat:</strong> {location.address}
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-2">Waktu: {new Date(location.timestamp).toLocaleString('id-ID')}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Upload Photo */}
+      {/* Tampilan Info Lokasi */}
       {location && (
-        <div>
-          <label className="block mb-2 font-semibold text-gray-700">📸 Upload Foto Bukti Kerja</label>
-          <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="w-full border border-gray-300 rounded-lg p-2" />
-
-          {photoPreview && (
-            <div className="mt-4">
-              <img src={photoPreview} alt="Preview" className="w-full max-h-64 object-contain rounded-lg border" />
-
-              {photoMetadata && (
-                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                  <h5 className="font-semibold text-blue-800 mb-2">📊 Metadata Foto</h5>
-                  {photoMetadata.error ? (
-                    <p className="text-red-600">{photoMetadata.error}</p>
-                  ) : (
-                    <div className="space-y-1 text-gray-700">
-                      <p>
-                        <strong>Waktu:</strong> {photoMetadata.dateTime}
-                      </p>
-                      <p>
-                        <strong>Device:</strong> {photoMetadata.make} {photoMetadata.model}
-                      </p>
-                      {photoMetadata.gps && (
-                        <div className="mt-2 p-2 bg-white rounded">
-                          <p className="font-semibold text-green-600">✓ GPS Foto:</p>
-                          <p>Lat: {photoMetadata.gps.latitude}</p>
-                          <p>Lon: {photoMetadata.gps.longitude}</p>
-                        </div>
-                      )}
-                      {!photoMetadata.gps && <p className="text-yellow-600 mt-2">⚠️ Foto tidak memiliki data GPS</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+        <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 space-y-2">
+          <h4 className="font-bold text-blue-800">Lokasi Terdeteksi</h4>
+          <p className="text-sm text-gray-700">{location.address || 'Alamat tidak ditemukan'}</p>
+          <p className="text-xs text-gray-500">Akurasi: ~{Math.round(location.accuracy)} meter</p>
         </div>
       )}
 
-      {/* Submit Button */}
+      {/* Upload Foto */}
+      {location && (
+        <div className="space-y-3">
+          <label className="block font-semibold text-gray-700">📸 Bukti Foto</label>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            {photoPreview ? <img src={photoPreview} alt="Preview" className="w-full h-auto max-h-72 object-contain rounded-lg mb-4" /> : <p className="text-gray-500">Ambil atau pilih foto pekerjaan Anda.</p>}
+            <button onClick={() => fileInputRef.current?.click()} className="mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg">
+              {photoPreview ? 'Ganti Foto' : 'Pilih Foto'}
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
+          </div>
+        </div>
+      )}
+
+      {/* Tombol Submit */}
       {location && photoFile && (
-        <button onClick={handleSubmit} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-          {loading ? '⏳ Mengirim...' : '✓ Submit Absensi'}
+        <button
+          onClick={handleSubmit}
+          disabled={submitLoading}
+          className="w-full flex justify-center items-center gap-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-transform transform active:scale-95"
+        >
+          {submitLoading ? <Spinner /> : '✓'}
+          {submitLoading ? 'Mengirim...' : 'Submit Absensi'}
         </button>
       )}
 
       {/* Status Message */}
-      {submitStatus && <div className={`p-4 rounded-lg text-center font-semibold ${submitStatus.includes('✓') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{submitStatus}</div>}
+      {submitStatus.message && <div className={`p-4 rounded-lg text-center font-semibold ${submitStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{submitStatus.message}</div>}
     </div>
   );
 }

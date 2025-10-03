@@ -9,11 +9,40 @@ import (
 	"attendance-backend/internal/service"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Solusi 1: Gunakan godotenv.Load() tanpa parameter
+	// Ini akan otomatis mencari .env di working directory
+	if err := godotenv.Load(); err != nil {
+		// Coba cari .env di beberapa lokasi
+		// Dapatkan path executable
+		ex, err := os.Executable()
+		if err == nil {
+			exPath := filepath.Dir(ex)
+			// Coba load dari directory executable
+			envPath := filepath.Join(exPath, ".env")
+			if err := godotenv.Load(envPath); err != nil {
+				// Coba dari parent directory
+				envPath = filepath.Join(exPath, "..", ".env")
+				if err := godotenv.Load(envPath); err != nil {
+					// Coba dari parent's parent directory
+					envPath = filepath.Join(exPath, "..", "..", ".env")
+					if err := godotenv.Load(envPath); err != nil {
+						log.Printf("Warning: Could not load .env file from any location")
+						log.Printf("Make sure .env file exists in project root")
+						// Tidak fatal, biarkan environment variables dari system
+					}
+				}
+			}
+		}
+	}
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {

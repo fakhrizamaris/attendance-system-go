@@ -1,60 +1,48 @@
+// FILE: app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AttendanceForm from './components/AttendanceForm';
 import AttendanceHistory from './components/AttendanceHistory';
+import { Camera, History } from 'lucide-react'; // Kita akan pakai ikon
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'absen' | 'history'>('absen');
 
+  // Untuk menggunakan ikon, install dulu: npm install lucide-react
+  // Jika belum, untuk sementara bisa ganti <Camera /> dan <History /> dengan emoji
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Sistem Absensi Karyawan
-          </h1>
-          <p className="text-gray-600">
-            Absensi dengan verifikasi lokasi dan bukti foto
-          </p>
-        </header>
+    <div className="container mx-auto max-w-2xl px-4 py-8">
+      <header className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Sistem Absensi</h1>
+        <p className="text-slate-500 mt-2">Verifikasi lokasi dan bukti foto secara real-time.</p>
+      </header>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('absen')}
-              className={`flex-1 py-4 px-6 font-semibold transition-colors ${
-                activeTab === 'absen'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              📍 Absen Sekarang
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`flex-1 py-4 px-6 font-semibold transition-colors ${
-                activeTab === 'history'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              📋 Riwayat Absensi
-            </button>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'absen' ? (
-              <AttendanceForm />
-            ) : (
-              <AttendanceHistory />
-            )}
-          </div>
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab('absen')}
+            className={`flex-1 flex justify-center items-center gap-2 py-4 px-6 font-semibold transition-all duration-300 ${activeTab === 'absen' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+          >
+            {/* <Camera size={20} /> (Ganti dengan emoji 📸 jika belum install lucide-react) */}
+            📸 Absen Sekarang
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 flex justify-center items-center gap-2 py-4 px-6 font-semibold transition-all duration-300 ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+          >
+            {/* <History size={20} /> (Ganti dengan emoji 📋 jika belum install lucide-react) */}
+            📋 Riwayat Absensi
+          </button>
         </div>
+
+        <div className="p-6 md:p-8">{activeTab === 'absen' ? <AttendanceForm /> : <AttendanceHistory />}</div>
       </div>
+
+      <footer className="text-center mt-8 text-sm text-gray-400">
+        <p>&copy; {new Date().getFullYear()} Your Company. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
-
-
-

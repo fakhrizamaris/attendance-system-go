@@ -1,2 +1,37 @@
 /.next
 /node_modules
+// FILE: .gitignore
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Test binary
+/attendance-backend/*.test
+
+# Output of the go coverage tool
+/attendance-backend/*.out
+
+# Go workspace file
+/attendance-backend/go.work
+
+# Environment variables
+/attendance-backend/.env.local
+
+# Uploads
+/attendance-backend/uploads/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+/attendance-backend/.env

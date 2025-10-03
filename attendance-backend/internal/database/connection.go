@@ -15,6 +15,7 @@ func Connect(cfg *config.Config) (*sql.DB, error) {
 		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
 	)
 
+
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err
