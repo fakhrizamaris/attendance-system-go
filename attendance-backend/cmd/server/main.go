@@ -72,6 +72,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	attendanceHandler := handlers.NewAttendanceHandler(attendanceService)
+	locationHandler := handlers.LocationHandler{GoogleAPIKey: cfg.GoogleMapsAPIKey}
 
 	// Setup router
 	router := gin.Default()
@@ -95,7 +96,9 @@ func main() {
 		protected.GET("/attendance/history", attendanceHandler.GetHistory)
 		protected.GET("/attendance/:id", attendanceHandler.GetByID)
 		protected.GET("/profile", authHandler.GetProfile)
+		protected.GET("/location/reverse-geocode", locationHandler.ReverseGeocode)
 	}
+	
 
 	// Serve uploaded files
 	router.Static("/uploads", cfg.UploadPath)

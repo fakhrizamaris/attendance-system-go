@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import { MapPin, Check, Camera } from 'lucide-react';
 
-// Perbarui interface untuk menyimpan detail alamat
 interface LocationData {
   latitude: number;
   longitude: number;
@@ -12,9 +11,9 @@ interface LocationData {
   address: {
     full: string;
     road?: string;
-    suburb?: string; // Kecamatan
+    locality?: string;
     city?: string;
-    state?: string; // Provinsi
+    state?: string;
   };
 }
 
@@ -25,16 +24,14 @@ const Spinner = () => (
   </svg>
 );
 
-export default function AttendanceForm() {
+export default function AttendanceForm({ setisSubmitting, onSuccess }: { setisSubmitting: (isSubmitting: boolean) => void; onSuccess: () => void }) {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [submitStatus, setSubmitStatus] = useState({ message: '', type: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- FUNGSI getLocation DIUBAH UNTUK MENGAMBIL DETAIL ALAMAT ---
   const getLocation = async () => {
     setLoading(true);
     setSubmitStatus({ message: '', type: '' });
@@ -52,46 +49,62 @@ export default function AttendanceForm() {
         });
       });
 
-      const locationData: Partial<LocationData> = {
+      // --- PERBAIKAN DI SINI ---
+      // Inisialisasi locationData dengan address yang sudah memiliki nilai default
+      const locationData: Partial<LocationData> & { address: { full: string } } = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
         timestamp: position.timestamp,
-        address: { full: 'Alamat tidak ditemukan' },
+        address: { full: 'Mencari alamat...' },
       };
 
       try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${locationData.latitude}&lon=${locationData.longitude}`);
+        const token = localStorage.getItem('jwt_token');
+        if (!token) throw new Error('Sesi tidak valid, silakan login ulang.');
+
+        const response = await fetch(`http://localhost:8080/api/location/reverse-geocode?lat=${locationData.latitude}&lon=${locationData.longitude}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
         const data = await response.json();
-        if (data && data.address) {
+
+        if (data.results && data.results.length > 0) {
+          const firstResult = data.results[0];
+          const addressComponents = firstResult.address_components;
+
+          const findComponent = (type: string) => addressComponents.find((c: any) => c.types.includes(type))?.long_name || '';
+          const streetName = findComponent('route') || findComponent('street_address') || findComponent('point_of_interest') || findComponent('premise');
+
           locationData.address = {
-            full: data.display_name,
-            road: data.address.road,
-            suburb: data.address.suburb,
-            city: data.address.city || data.address.county,
-            state: data.address.state,
+            full: firstResult.formatted_address,
+            road: streetName,
+            locality: findComponent('administrative_area_level_4') || findComponent('administrative_area_level_3'),
+            city: findComponent('administrative_area_level_2'),
+            state: findComponent('administrative_area_level_1'),
           };
+        } else {
+          locationData.address.full = 'Alamat detail tidak ditemukan oleh Google Maps.';
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Gagal mendapatkan alamat:', error);
+        locationData.address.full = `Gagal mendapatkan alamat: ${error.message}`;
       }
 
       setLocation(locationData as LocationData);
     } catch (error: any) {
-      alert('Gagal mendapatkan lokasi: ' + error.message);
+      alert('Gagal mendapatkan lokasi GPS: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- FUNGSI handlePhotoSelect DIUBAH UNTUK MENAMPILKAN DETAIL ALAMAT ---
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !location) {
       alert('Harap ambil lokasi terlebih dahulu sebelum memilih foto.');
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -104,35 +117,39 @@ export default function AttendanceForm() {
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
 
-        // Siapkan semua baris teks
-        const timestamp = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'long' });
-        const addressLines = [
-          location.address.road || 'Jalan tidak terdeteksi',
-          `${location.address.suburb || ''}, ${location.address.city || ''}`,
-          location.address.state || '',
-          `Lat: ${location.latitude?.toFixed(6)}, Lon: ${location.longitude?.toFixed(6)}`,
-        ].filter((line) => line.trim() !== ''); // Filter baris kosong
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+        const dateString = now.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
 
-        const fontSize = Math.max(20, Math.floor(img.width / 50)); // Font sedikit lebih kecil
+        const locationLine = [location.address.locality, location.address.city].filter(Boolean).join(', ');
+        const overlayLines = [timeString, dateString, location.address.road , locationLine, location.address.state || '', `Lat: ${location.latitude?.toFixed(6)}, Lon: ${location.longitude?.toFixed(6)}`].filter(
+          (line) => line && line.trim() !== ''
+        );
+
+        const fontSize = Math.max(20, Math.floor(img.width / 50));
         const lineHeight = fontSize * 1.4;
-        const boxHeight = lineHeight * (addressLines.length + 1) + 40; // +1 untuk baris waktu
+        const boxHeight = lineHeight * overlayLines.length + 40;
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(0, canvas.height - boxHeight, canvas.width, boxHeight);
-
         ctx.fillStyle = 'white';
-        ctx.font = `bold ${fontSize}px Arial`;
         ctx.textAlign = 'left';
 
-        // Gambar waktu
         let currentY = canvas.height - boxHeight + lineHeight;
-        ctx.fillText(timestamp, 20, currentY);
 
-        // Gambar baris-baris alamat
-        ctx.font = `${fontSize}px Arial`; // Font non-bold untuk alamat
-        addressLines.forEach((line) => {
+        overlayLines.forEach((line, index) => {
+          ctx.font = index === 0 ? `bold ${fontSize}px Arial` : `${fontSize}px Arial`;
+          ctx.fillText(line ?? '', 20, currentY);
           currentY += lineHeight;
-          ctx.fillText(line, 20, currentY);
         });
 
         canvas.toBlob(
@@ -152,18 +169,17 @@ export default function AttendanceForm() {
     reader.readAsDataURL(file);
   };
 
-  // handleSubmit tetap sama
   const handleSubmit = async () => {
     if (!location || !photoFile) {
       alert('Lokasi dan foto harus diisi!');
       return;
     }
-    setSubmitLoading(true);
+    setisSubmitting(true);
     setSubmitStatus({ message: '', type: '' });
     const token = localStorage.getItem('jwt_token');
     if (!token) {
+      setisSubmitting(false);
       setSubmitStatus({ message: '✗ Gagal: Anda belum login atau sesi telah habis.', type: 'error' });
-      setSubmitLoading(false);
       return;
     }
     try {
@@ -182,20 +198,11 @@ export default function AttendanceForm() {
       if (!response.ok) {
         throw new Error(result.error || 'Gagal mengirim absensi.');
       }
-      setSubmitStatus({ message: '✓ Absensi berhasil disimpan!', type: 'success' });
-      setTimeout(() => {
-        setLocation(null);
-        setPhotoFile(null);
-        setPhotoPreview('');
-        setSubmitStatus({ message: '', type: '' });
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      }, 2000);
+      onSuccess();
     } catch (error: any) {
       setSubmitStatus({ message: `✗ Gagal: ${error.message}`, type: 'error' });
     } finally {
-      setSubmitLoading(false);
+      setisSubmitting(false);
     }
   };
 
@@ -236,13 +243,9 @@ export default function AttendanceForm() {
       )}
 
       {location && photoFile && (
-        <button
-          onClick={handleSubmit}
-          disabled={submitLoading}
-          className="w-full flex justify-center items-center gap-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-transform transform active:scale-95"
-        >
-          {submitLoading ? <Spinner /> : <Check size={20} />}
-          {submitLoading ? 'Mengirim...' : 'Submit Absensi'}
+        <button onClick={handleSubmit} className="w-full flex justify-center items-center gap-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-transform transform active:scale-95">
+          <Check size={20} />
+          Submit Absensi
         </button>
       )}
 

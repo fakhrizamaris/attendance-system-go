@@ -38,6 +38,8 @@ type Config struct {
 
 	// CORS
 	CORSAllowedOrigins []string
+
+	GoogleMapsAPIKey string
 }
 
 func Load() (*Config, error) {
@@ -46,7 +48,7 @@ func Load() (*Config, error) {
 
 	expiryHours, _ := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "24"))
 	maxUploadSize, _ := strconv.ParseInt(getEnv("MAX_UPLOAD_SIZE", "10485760"), 10, 64)
-	maxGPSAccuracy, _ := strconv.ParseFloat(getEnv("MAX_GPS_ACCURACY", "100"), 64)
+	maxGPSAccuracy, _ := strconv.ParseFloat(getEnv("MAX_GPS_ACCURACY", "500"), 64)
 	maxDistanceDiff, _ := strconv.ParseFloat(getEnv("MAX_DISTANCE_DIFFERENCE", "200"), 64)
 	rateLimit, _ := strconv.Atoi(getEnv("RATE_LIMIT_PER_HOUR", "10"))
 
@@ -73,6 +75,7 @@ func Load() (*Config, error) {
 		RateLimitPerHour:      rateLimit,
 
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+		GoogleMapsAPIKey: getEnv("GOOGLE_MAPS_API_KEY", ""),
 	}, nil
 }
 
